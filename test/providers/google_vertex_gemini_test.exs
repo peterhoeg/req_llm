@@ -604,6 +604,60 @@ defmodule ReqLLM.Providers.GoogleVertex.GeminiTest do
     end
   end
 
+  describe "non-2xx responses" do
+    @envoy_reset "upstream connect error or disconnect/reset before headers. reset reason: connection termination"
+
+    defp vertex_error(model, status, content_type, body) do
+      Req.Test.stub(__MODULE__, fn conn ->
+        conn
+        |> Plug.Conn.put_resp_content_type(content_type)
+        |> Plug.Conn.send_resp(status, body)
+      end)
+
+      ReqLLM.generate_text(model, "Hello",
+        access_token: "test-token",
+        project_id: "test-project",
+        region: "global",
+        max_retries: 0,
+        req_http_options: [plug: {Req.Test, __MODULE__}]
+      )
+    end
+
+    defp gemini_model do
+      %LLMDB.Model{
+        id: "gemini-2.5-flash",
+        model: "gemini-2.5-flash",
+        provider: :google_vertex,
+        capabilities: %{chat: true}
+      }
+    end
+
+    test "a plain-text 503 from an Envoy reset is an API error for Gemini" do
+      assert {:error, %ReqLLM.Error.API.Request{status: 503, response_body: @envoy_reset}} =
+               vertex_error(gemini_model(), 503, "text/plain", @envoy_reset)
+    end
+
+    test "a plain-text 503 from an Envoy reset is an API error for Claude" do
+      model = %LLMDB.Model{
+        id: "claude-opus-4-7@20260414",
+        model: "claude-opus-4-7@20260414",
+        provider: :google_vertex,
+        capabilities: %{chat: true},
+        extra: %{family: "claude-opus"}
+      }
+
+      assert {:error, %ReqLLM.Error.API.Request{status: 503, response_body: @envoy_reset}} =
+               vertex_error(model, 503, "text/plain", @envoy_reset)
+    end
+
+    test "a JSON error keeps Google's error body" do
+      body = %{"error" => %{"code" => 503, "message" => "unavailable", "status" => "UNAVAILABLE"}}
+
+      assert {:error, %ReqLLM.Error.API.Request{status: 503, response_body: ^body}} =
+               vertex_error(gemini_model(), 503, "application/json", Jason.encode!(body))
+    end
+  end
+
   describe "adaptive thinking for Claude on Vertex" do
     test "prepared request includes adaptive thinking for sparse Opus platform metadata" do
       model = %LLMDB.Model{
