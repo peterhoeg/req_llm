@@ -180,7 +180,8 @@ defmodule ReqLLM.Step.ErrorTest do
       {~s({"message": "Validation failed"}), "Validation failed"},
       {~s({"detail": "Resource not found"}), "Resource not found"},
       {~s({"details": "Rate limit exceeded"}), "Rate limit exceeded"},
-      {~s({"error_description": "The request was malformed"}), "The request was malformed"}
+      {~s({"error_description": "The request was malformed"}), "The request was malformed"},
+      {~s([{"error": {"message": "Quota exceeded"}}]), "Quota exceeded"}
     ]
 
     test "extracts error messages from various API response formats" do

@@ -632,6 +632,16 @@ defmodule ReqLLM.Providers.GoogleVertex.GeminiTest do
       }
     end
 
+    defp maas_model do
+      %LLMDB.Model{
+        id: "zai-org/glm-4.7-maas",
+        model: "zai-org/glm-4.7-maas",
+        provider: :google_vertex,
+        capabilities: %{chat: true},
+        extra: %{family: "glm"}
+      }
+    end
+
     test "a plain-text 503 from an Envoy reset is an API error for Gemini" do
       assert {:error, %ReqLLM.Error.API.Request{status: 503, response_body: @envoy_reset}} =
                vertex_error(gemini_model(), 503, "text/plain", @envoy_reset)
@@ -655,6 +665,15 @@ defmodule ReqLLM.Providers.GoogleVertex.GeminiTest do
 
       assert {:error, %ReqLLM.Error.API.Request{status: 503, response_body: ^body}} =
                vertex_error(gemini_model(), 503, "application/json", Jason.encode!(body))
+    end
+
+    test "a list-wrapped JSON error keeps the provider's message for MaaS models" do
+      body = [%{"error" => %{"code" => 429, "message" => "Resource exhausted: quota exceeded"}}]
+
+      assert {:error, %ReqLLM.Error.API.Request{status: 429, response_body: ^body} = error} =
+               vertex_error(maas_model(), 429, "application/json", Jason.encode!(body))
+
+      assert error.reason =~ "Resource exhausted: quota exceeded"
     end
   end
 

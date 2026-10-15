@@ -161,6 +161,8 @@ defmodule ReqLLM.Step.Error do
     end
   end
 
+  defp extract_api_error_message([body]), do: extract_api_error_message(body)
+
   defp extract_api_error_message(%{"error" => %{"message" => message}}) when is_binary(message) do
     message
   end
