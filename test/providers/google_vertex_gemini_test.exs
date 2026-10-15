@@ -660,11 +660,30 @@ defmodule ReqLLM.Providers.GoogleVertex.GeminiTest do
                vertex_error(model, 503, "text/plain", @envoy_reset)
     end
 
+    test "a plain-text 503 from an Envoy reset is an API error for MaaS models" do
+      assert {:error, %ReqLLM.Error.API.Request{status: 503, response_body: @envoy_reset}} =
+               vertex_error(maas_model(), 503, "text/plain", @envoy_reset)
+    end
+
+    test "a plain-text 503 from an Envoy reset is an API error for Mistral" do
+      model = %LLMDB.Model{
+        id: "mistral-medium-3",
+        model: "mistral-medium-3",
+        provider: :google_vertex,
+        capabilities: %{chat: true}
+      }
+
+      assert {:error, %ReqLLM.Error.API.Request{status: 503, response_body: @envoy_reset}} =
+               vertex_error(model, 503, "text/plain", @envoy_reset)
+    end
+
     test "a JSON error keeps Google's error body" do
       body = %{"error" => %{"code" => 503, "message" => "unavailable", "status" => "UNAVAILABLE"}}
 
-      assert {:error, %ReqLLM.Error.API.Request{status: 503, response_body: ^body}} =
+      assert {:error, %ReqLLM.Error.API.Request{status: 503, response_body: ^body} = error} =
                vertex_error(gemini_model(), 503, "application/json", Jason.encode!(body))
+
+      assert error.reason =~ "unavailable"
     end
 
     test "a list-wrapped JSON error keeps the provider's message for MaaS models" do
